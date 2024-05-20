@@ -19,40 +19,42 @@ pipeline {
             }
         stage('Checkout') {
             steps {
-              git credentialsId: 'my-credentials-id', url: 'https://github.com/your-repo.git', branch: 'master'
+              git credentialsId: 'my-credentials-id', url: 'https://github.com/KondaVenkateswarlu11/Inc42Media.git', branch: 'master'
+
 
             }
         }
         stage('Deploy MySQL') {
             steps {
-                // This deploys the MySQL service to your Kubernetes cluster
-                sh '''
-                    kubectl apply -f /path/to/your/mysql/deployment.yaml
-                    kubectl apply -f /path/to/your/mysql/service.yaml
-                    kubectl apply -f /path/to/your/mysql/pvc.yaml
-                    kubectl apply -f /path/to/your/mysql/secret.yaml
-                '''
+                script {
+                    auth_login("${env.GKE_DEV_CLUSTER_NAME}", "${env.GKE_DEV_ZONE}", "${env.GKE_DEV_PROJECT}").call()
+
+                                    // This deploys the MySQL service to your Kubernetes cluster
+                    sh '''
+                        cd Inc42Media/WordPressProject/
+                        kubectl apply -f 1-storageclass.yaml
+                        kubectl apply -f 2-mysql-pvc.yaml
+                        kubectl apply -f 4-mysql-secret.yaml
+                        kubectl apply -f 5-mysql-deploy.yaml
+                        kubectl apply -f 6-mysql-svc.yaml
+
+                    '''
+                }
             }
         }
 
         stage('Deploy WordPress') {
             steps {
-                // This deploys the WordPress service to your Kubernetes cluster
-                sh '''
-                    kubectl apply -f /path/to/your/wordpress/deployment.yaml
-                    kubectl apply -f /path/to/your/wordpress/service.yaml
-                    kubectl apply -f /path/to/your/wordpress/pvc.yaml
-                '''
-            }
-        }
-
-        stage('Verify Deployment') {
-            steps {
-                // This verifies the status of your deployments
-                sh '''
-                    kubectl rollout status deployment/wordpress
-                    kubectl rollout status deployment/mysql
-                '''
+                script {
+                    auth_login("${env.GKE_DEV_CLUSTER_NAME}", "${env.GKE_DEV_ZONE}", "${env.GKE_DEV_PROJECT}").call()
+                    // This deploys the WordPress service to your Kubernetes cluster
+                    sh '''
+                        kubectl apply -f 3-wordpress-pvc.yaml
+                        kubectl apply -f 7-wordpress-deploy.yaml
+                        kubectl apply -f 8-wordpress-svc.yaml
+                        
+                    '''
+                }
             }
         }
     }

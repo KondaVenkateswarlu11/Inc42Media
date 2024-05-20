@@ -1,0 +1,74 @@
+pipeline {
+    agent {
+        label 'k8s-slave' 
+    }
+    environment {
+        GKE_DEV_CLUSTER_NAME = "cart-cluster"
+        GKE_DEV_ZONE = "us-west1-a"
+        GKE_DEV_PROJECT = "delta-sprite-416312"
+    }
+    stages {
+        stage ('Authenticate to Google Cloud GKE') {
+            steps {
+                echo "Executing in Google Cloud auth stage"
+                script {
+                    //gke_cluster_name, gke_zone, gke_project 
+                    auth_login("${env.GKE_DEV_CLUSTER_NAME}", "${env.GKE_DEV_ZONE}", "${env.GKE_DEV_PROJECT}").call()
+                    }  
+                }
+            }
+        stage('Checkout') {
+            steps {
+              git credentialsId: 'my-credentials-id', url: 'https://github.com/your-repo.git', branch: 'master'
+
+            }
+        }
+        stage('Deploy MySQL') {
+            steps {
+                // This deploys the MySQL service to your Kubernetes cluster
+                sh '''
+                    kubectl apply -f /path/to/your/mysql/deployment.yaml
+                    kubectl apply -f /path/to/your/mysql/service.yaml
+                    kubectl apply -f /path/to/your/mysql/pvc.yaml
+                    kubectl apply -f /path/to/your/mysql/secret.yaml
+                '''
+            }
+        }
+
+        stage('Deploy WordPress') {
+            steps {
+                // This deploys the WordPress service to your Kubernetes cluster
+                sh '''
+                    kubectl apply -f /path/to/your/wordpress/deployment.yaml
+                    kubectl apply -f /path/to/your/wordpress/service.yaml
+                    kubectl apply -f /path/to/your/wordpress/pvc.yaml
+                '''
+            }
+        }
+
+        stage('Verify Deployment') {
+            steps {
+                // This verifies the status of your deployments
+                sh '''
+                    kubectl rollout status deployment/wordpress
+                    kubectl rollout status deployment/mysql
+                '''
+            }
+        }
+    }
+}
+
+
+
+def auth_login(gke_cluster_name, gke_zone, gke_project) {
+    return {
+        echo "Entering Authentication method for GKE Cluster Login"
+        sh "gcloud config set account jenkins@delta-sprite-416312.iam.gserviceaccount.com"
+        # gcloud auth activate-service-account jenkins@nice-carving-411801.iam.gserviceaccount.com --key-file=key.json
+        sh "gcloud compute instances list"
+        echo "************* Listing Number of Nodes in K8S *************"
+        sh "gcloud container clusters get-credentials $gke_cluster_name --zone $gke_zone --project $gke_project"
+        sh "kubectl get nodes"
+
+    }     
+}

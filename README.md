@@ -1,6 +1,6 @@
 # Project Assignment Flow: 
 
-* I have an extensive working knowledge on working in jenkins which is an ci server from building the application to deploying it to the Kubernetes clusters in aws.
+* I have an extensive working knowledge on working in jenkins which is an ci server from building the application to deploying it to the Kubernetes clusters in AWS or GCP.
 
 * I have written robust pipeline scripts for my java based applications using declarative pipelines and groovy scripts.
 
@@ -29,5 +29,9 @@ DYNAMIC method I mean every time a new commit happen to the source code and new 
 * This is how I have developed the Jenkins pipeline for the GoProject and Nextjs project.
 
 * For WordPress Application I have written required kubernetes yaml files and executed it through the pipleine by writing some dynamic groovy methods which will execute those yaml files so that the wordpress webapp get deployed.
+
+* In this task I have used Kubernetes because I don't know Docker-Compose and we dont use it in our company
+
+* For The application to deployed to Production definitely approval is required by the devops lead or manager and that approval. And one mmore point over here while going to the production deployment we will use tags not the branches as tgas are immutable, Till the Stage deployment we will be using the Master barnch.
 
 

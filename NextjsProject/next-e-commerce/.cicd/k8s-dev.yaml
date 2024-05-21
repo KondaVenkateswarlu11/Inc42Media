@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: 
+  name: e-com-dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: e-com-dev
+  template:
+    metadata:
+      labels:
+        name: e-com-dev
+    spec:
+      containers:
+        - name: e-com-dev
+        # the below image should be dynamically change based on the devlelopment 
+          image: DIT #docker.io/venkat3cs/e-com:82b3701
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "250m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+---
+# service 
+apiVersion: v1
+kind: Service
+metadata:  
+  name: e-com-dev-svc
+spec:
+  selector:
+    name: e-com-dev
+  ports:
+  - protocol: TCP
+    port: 80 # container or host or service
+    targetPort: 8761 # ContainerPort 
+  type: NodePort #ClusterIP, LoadBalancer, NodePort

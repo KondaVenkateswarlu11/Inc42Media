@@ -1,0 +1,1 @@
+{"ast":null,"code":"import { auth } from \"../config/firebase\";\nexport default function emailLogin({\n  email,\n  password\n}) {\n  return auth.signInWithEmailAndPassword(email, password);\n}","map":null,"metadata":{},"sourceType":"module"}

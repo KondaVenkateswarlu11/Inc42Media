@@ -1,0 +1,298 @@
+// This Jenkinsfile is for the GoApp Deployment.
+pipeline {
+    agent {
+        label 'k8s-slave' 
+    }
+    parameters {
+            choice(name: 'buildOnly',
+                choices: 'no\nyes',
+                description: 'This will only build the application'
+            )
+            choice(name: 'scanOnly',
+                choices: 'no\nyes',
+                description: 'This will Scan the application'
+            )
+            choice(name: 'dockerPush',
+                choices: 'no\nyes',
+                description: 'This will build the app, docker build, docker push'
+            )
+            choice(name: 'deployToDev',
+                choices: 'no\nyes',
+                description: 'This will Deploy the app to Dev env'
+            )
+            choice(name: 'deployToTest',
+                choices: 'no\nyes',
+                description: 'This will Deploy the app to Test env'
+            )
+            choice(name: 'deployToStage',
+                choices: 'no\nyes',
+                description: 'This will Deploy the app to Stage env'
+            )
+            choice(name: 'deployToProd',
+                choices: 'no\nyes',
+                description: 'This will Deploy the app to Prod env'
+            )
+    }
+    environment {
+        APPLICATION_NAME = "goCart"
+        DOCKER_HUB = "docker.io/venkat3cs"
+        DOCKER_CREDS = credentials('Hub.Docker_Creds')
+
+        SONAR_URL = "http://54.236.253.51:9000/" 
+        SONAR_TOKEN = credentials('Sonar_Token')
+
+        EKS_DEV_CLUSTER_NAME = "clothcluster"
+        EKS_DEV_REGION = "us-east-1"
+        
+        EKS_TEST_CLUSTER_NAME = "eurekaCluster-Test"
+        EKS_TEST_REGION = "us-west-1"
+            
+        EKS_STAGE_CLUSTER_NAME = "eurekaCluster-Stage"
+        EKS_STAGE_REGION = "us-west-1"
+
+        EKS_PROD_CLUSTER_NAME = "eurekaCluster-Prod"
+        EKS_PROD_REGION = "us-west-1"
+
+        DOCKER_IMAGE_TAG = sh(script: 'git log -1 --pretty=%h', returnStdout:true).trim()
+
+        K8S_DEV_FILE = "k8s_dev.yaml"
+        K8S_TEST_FILE = "k8s_test.yaml"
+        K8S_STAGE_FILE = "k8s_stage.yaml"
+        K8S_PROD_FILE = "k8s_prod.yaml"   
+
+        DEV_NAMESPACE = "cart-dev-ns"
+        TEST_NAMESPACE = "cart-test-ns"
+        STAGE_NAMESPACE = "cart-stage-ns"
+        PROD_NAMESPACE = "cart-prod-ns"
+
+    }
+    stages {
+        stage ('Build'){
+            when {
+                    anyOf {
+                        expression {
+                            params.buildOnly == 'yes'                     
+                        }
+                    }
+                }
+            // Application Build happens here
+            steps { 
+                echo "Building the ${env.APPLICATION_NAME} application"
+                sh 'npm install'
+                sh 'npm run build' 
+            }
+        }
+        stage ('Unit Tests') { //test files should be available otherwise will get a msg
+        // no test files found
+            when{
+                    anyOf{
+                        expression{
+                            params.buildOnly == 'yes'
+                            params.dockerPush == 'yes'
+                        }
+                    }
+                }
+            steps {
+                echo "Performing Unit tests for ${env.APPLICATION_NAME} application"
+                sh 'npm run test'
+            }
+        }
+        stage("Sonar"){
+                when{
+                    anyOf{
+                        expression{
+                            params.scanOnly == 'yes'
+                        }
+                    }
+                }
+                steps{
+                    echo "*******************Sonar scans will happen at this stage***********************"
+                    withSonarQubeEnv('Sonar-Server'){
+                        sh"""
+                            mvn clean verify sonar:sonar \
+                                -Dsonar.projectKey=goCart \
+                                -Dsonar.host.url=${env.SONAR_URL} \
+                                -Dsonar.login=${SONAR_TOKEN}              
+                        """
+                    }
+                    timeout (time: 5, unit: 'MINUTES'){
+                        script{
+                            waitForQualityGate abortPipeline: true
+                        }
+                        
+                    }
+                }
+            }
+    
+        stage("Docker Build and Push"){
+                when{
+                    anyOf{
+                        expression{
+                            params.dockerPush == 'yes'
+                        }
+                    }
+                }
+                steps{
+                    script{
+                        dockerBuildandPush().call()
+                    }
+                    
+                }
+            }
+        stage("Deploy Dev"){
+                when{
+                    anyOf{
+                        expression{
+                            params.deployToDev == 'yes'
+                        }
+                    }
+                    anyOf {
+                            branch 'master'
+                            branch 'feature'
+                    }
+                }
+                steps{
+                    script{
+                        imageValidation().call()
+                        def docker_image = "${env.DOCKER_HUB}/${env.APPLICATION_NAME}:${env.DOCKER_IMAGE_TAG}"
+                        auth_login_eks("${env.EKS_DEV_CLUSTER_NAME}", "${env.EKS_DEV_REGION}").call()
+                        k8sdeploy("${env.K8S_DEV_FILE}", docker_image, "${env.DEV_NAMESPACE}").call()
+                        echo "Deployed to Dev Successfully!!!!!!!!!"
+                    }
+                }
+            }
+        stage("Deploy Test"){
+                when{
+                    anyOf{
+                        expression{
+                            params.deployToTest == 'yes'
+                        }
+                    }
+                    anyOf {
+                            branch 'master'
+                            branch 'feature'
+                    }
+                }
+                steps{
+                    script{
+                        imageValidation().call()
+                        def docker_image = "${env.DOCKER_HUB}/${env.APPLICATION_NAME}:${env.DOCKER_IMAGE_TAG}"
+                        auth_login_eks("${env.EKS_TEST_CLUSTER_NAME}", "${env.EKS_TEST_REGION}").call()
+                        k8sdeploy("${env.K8S_TEST_FILE}", docker_image, "${env.TEST_NAMESPACE}").call()
+                        echo "Deployed to Test Successfully!!!!!!!!!"
+                    }
+                }
+            }
+        stage("Deploy Stage"){
+                when{
+                    anyOf{
+                        expression{
+                            params.deployToStage == 'yes'
+                        }
+                    }
+                    anyOf {
+                            branch 'master'
+                            branch 'feature'
+                    }
+                }
+                steps{
+                    script{
+                        imageValidation().call()
+                        def docker_image = "${env.DOCKER_HUB}/${env.APPLICATION_NAME}:${env.DOCKER_IMAGE_TAG}"
+                        auth_login_eks("${env.EKS_STAGE_CLUSTER_NAME}", "${env.EKS_STAGE_REGION}").call()
+                        k8sdeploy("${env.K8S_STAGE_FILE}", docker_image, "${env.STAGE_NAMESPACE}").call()
+                        echo "Deployed to Stage Successfully!!!!!!!!!"
+                    }
+                }
+            }
+        stage("Deploy Prod"){
+                when {
+                    // deployToProd === yes "and" branch "release/*****" 
+                    allOf {
+                        anyOf {
+                            expression {
+                                params.deployToProd == 'yes'
+                            }
+                        }
+                        anyOf {
+                            branch 'master'
+                            branch 'feature'
+                            //branch 'release/*'
+                            // only tags with vx.x.x should deploy to prod
+                        }
+                    }
+                }
+                steps{
+                    timeout(time: 300, unit: 'SECONDS') {
+                        input message: "Deploying ${env.APPLICATION_NAME} to prod ????", ok: 'yes', submitter: 'venkat'
+                    }
+                    script{
+                        imageValidation().call()
+                        def docker_image = "${env.DOCKER_HUB}/${env.APPLICATION_NAME}:${env.DOCKER_IMAGE_TAG}"
+                        auth_login_eks("${env.EKS_PROD_CLUSTER_NAME}", "${env.EKS_PROD_REGION}").call()
+                        k8sdeploy("${env.K8S_PROD_FILE}", docker_image, "${env.PROD_NAMESPACE}").call()
+                        echo "Deployed to Prod Successfully!!!!!!!!!"
+                    }
+                }
+            }
+        
+        
+        
+    }
+    
+}
+
+
+//This method will build the image and push it to registry
+def dockerBuildandPush(){
+    return{
+           
+        sh "ls -al .cicd"               
+        echo "*******************  Build Docker Image  ********************************"
+        sh "docker build --force-rm --no-cache --pull --rm=true -t ${env.DOCKER_HUB}/${env.APPLICATION_NAME}:${env.DOCKER_IMAGE_TAG} ./.cicd"
+        
+        echo "*******************  Login to DockerHub   ********************************"
+        sh "docker login -u ${DOCKER_CREDS_USR} -p ${DOCKER_CREDS_PSW}"
+
+        echo "*******************  push the docker image to dockerhub  ********************************"
+        sh "docker push ${env.DOCKER_HUB}/${env.APPLICATION_NAME}:${env.DOCKER_IMAGE_TAG}"
+        echo "Pushed the image succesfully!!!"
+    
+    }
+}
+
+//This methode will validate the image 
+def imageValidation(){
+    return{
+        println ("Pulling the docker image")
+        try{
+            sh "docker pull ${env.DOCKER_HUB}/${env.APPLICATION_NAME}:${GIT_COMMIT}"
+        }
+        catch (Exception e) {
+            println("OOPS!, docker images with this tag is not available")
+            buildApp().call()
+            dockerBuildandPush().call()
+        }
+
+    }
+}
+
+def auth_login_eks(eks_cluster_name, eks_region){
+    return {
+        echo "Entering Authentication method for EKS Cluster Login"
+        # Update kubeconfig with EKS cluster details
+        sh "aws eks --region $eks_region update-kubeconfig --name $eks_cluster_name"
+        echo "************* Listing Number of Nodes in EKS *************"
+        # List the nodes in the EKS cluster
+        sh "kubectl get nodes"
+    }    
+}
+
+def k8sdeploy(fileName, docker_image, namespace ){
+    return {
+        echo "Executing K8S Deploy Method"
+        echo "Final Image Tag is $docker_image"
+        sh "sed -i "s|DIT|$docker_image|g" ./.cicd/$fileName"
+        sh "kubectl apply -f ./.cicd/$fileName -n $namespace"
+    }
+}

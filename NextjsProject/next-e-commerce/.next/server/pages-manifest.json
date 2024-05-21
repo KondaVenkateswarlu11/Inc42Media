@@ -1,0 +1,22 @@
+{
+  "/404": "pages/404.html",
+  "/[product]": "pages/[product].js",
+  "/_app": "pages/_app.js",
+  "/account/addresses/add-address": "pages/account/addresses/add-address.html",
+  "/account/addresses": "pages/account/addresses.html",
+  "/account/favorites": "pages/account/favorites.html",
+  "/account": "pages/account.html",
+  "/account/logout": "pages/account/logout.html",
+  "/account/orders": "pages/account/orders.html",
+  "/api/hello": "pages/api/hello.js",
+  "/brand/[brand]": "pages/brand/[brand].js",
+  "/cart": "pages/cart.html",
+  "/category/[category]": "pages/category/[category].js",
+  "/": "pages/index.html",
+  "/login": "pages/login.html",
+  "/login/login-form": "pages/login/login-form.html",
+  "/login/register-form": "pages/login/register-form.html",
+  "/search/[text]": "pages/search/[text].js",
+  "/_error": "pages/_error.js",
+  "/_document": "pages/_document.js"
+}

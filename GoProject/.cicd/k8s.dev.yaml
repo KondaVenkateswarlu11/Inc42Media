@@ -35,5 +35,5 @@ spec:
   ports:
   - protocol: TCP
     port: 80 # container or host or service
-    targetPort: 8761 # ContainerPort 
+    targetPort: 3000 # ContainerPort 
   type: NodePort #ClusterIP, LoadBalancer, NodePort

@@ -16,11 +16,9 @@ COPY ../ ./
 # Build the application
 RUN npm run build
 
-# Install serve to serve the application
-RUN npm install -g serve
-
 # The application listens on port 3000, so expose this port
 EXPOSE 3000
 
 # Define the command to run the application
-CMD ["serve", "-s", "out"]
+CMD ["npm", "run", "start"]
+
